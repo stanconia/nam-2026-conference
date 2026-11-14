@@ -104,7 +104,7 @@ a deterministic generated SVG portrait (`src/components/GeneratedAvatar.jsx`).
 the seed derives it from the ratings on that speaker's sessions, so most
 speakers start at 0.
 
-**`users`** — `speaker_id` links an attendee to their speaker profile. When set,
+**`users`** — `interests_text` is the attendee's free text (at most 500 characters, API-enforced; `interestsText`). `speaker_id` links an attendee to their speaker profile. When set,
 `GET /api/users/:id` returns `isSpeaker: true`, a `speaker` object and
 `speakingSessions`. The UI uses `isSpeaker` to offer "Your speaker profile" in
 the attendee menu and `speakerId` to link it and mark that profile as yours;
