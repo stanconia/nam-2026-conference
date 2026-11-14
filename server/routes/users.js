@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { db } from '../db.js';
-import { SESSION_SELECT, toUser, toSpeaker, toSession } from '../lib/query.js';
+import { SESSION_SELECT, toUser, toSpeaker, toSession, toAvailability } from '../lib/query.js';
 import { reserveSeat, releaseSeat, seatState } from '../lib/seats.js';
 import { attendanceState, checkIn, rateSession } from '../lib/attendance.js';
 import { todayFor, scheduleFor } from '../lib/agenda.js';
+import { validateAvailability, sessionDays, setAvailability, availabilityFor } from '../lib/availability.js';
 import { agendaCalendar, baseUrlFor } from '../lib/ical.js';
 
 export const usersRouter = Router();
@@ -48,7 +49,18 @@ usersRouter.get('/:id', (req, res) => {
     reservations: myReservations.all(row.id).map((r) => ({ sessionId: r.session_id, status: r.status })),
     checkIns: myCheckIns.all(row.id).map((c) => c.session_id),
     ratings: myRatings.all(row.id).map((r) => ({ sessionId: r.session_id, stars: r.stars })),
+    availability: availabilityFor(row.id).map(toAvailability),
   }));
+});
+
+/** Replace which days (and hours on them) this attendee can attend. */
+usersRouter.put('/:id/availability', (req, res) => {
+  if (!userExists.get(req.params.id)) return res.status(404).json({ error: 'Attendee not found' });
+  const entries = req.body?.days;
+  const problem = validateAvailability(entries, sessionDays());
+  if (problem) return res.status(400).json({ error: problem });
+  setAvailability(Number(req.params.id), entries);
+  res.json(availabilityFor(Number(req.params.id)).map(toAvailability));
 });
 
 /** Replace the attendee's chosen topics. Every entry must be a topic-kind tag name. */

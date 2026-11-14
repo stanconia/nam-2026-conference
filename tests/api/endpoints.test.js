@@ -163,6 +163,7 @@ describe('Every endpoint answers', () => {
       () => api.put(`/users/999999/reservations/${ids.session}`, { day: days[0], time: '08:00' }),
       () => api.put(`/users/999999/checkins/${ids.session}`, { day: days[0], time: '08:00' }),
       () => api.put(`/users/999999/follows/${ids.speaker}`, {}),
+      () => api.put('/users/999999/availability', { days: [] }),
       () => api.put(`/users/${ids.user}/follows/999999`, {}),
     ];
     for (const write of writes) {
@@ -192,6 +193,7 @@ describe('Every endpoint answers', () => {
       'GET users/:id/reservations/:sessionId',
       'PUT users/:id/reservations/:sessionId', 'PUT users/:id/checkins/:sessionId',
       'PUT users/:id/ratings/:sessionId', 'PUT users/:id/follows/:speakerId',
+      'PUT users/:id/availability',
       'PUT users/:id/interests',
       'PUT users/:id/interests-text',
       'DELETE users/:id/reservations/:sessionId', 'DELETE users/:id/follows/:speakerId',

@@ -196,6 +196,14 @@ CREATE TABLE IF NOT EXISTS speaker_follows (
   PRIMARY KEY (user_id, speaker_id)
 );
 
+CREATE TABLE IF NOT EXISTS user_availability (
+  user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  day       TEXT NOT NULL,
+  from_time TEXT,
+  to_time   TEXT,
+  PRIMARY KEY (user_id, day)
+);
+
 CREATE TABLE IF NOT EXISTS ratings (
   id         INTEGER PRIMARY KEY,
   user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -271,6 +279,7 @@ export function dropAll() {
     DROP TABLE IF EXISTS check_ins;
     DROP TABLE IF EXISTS reservations;
     DROP TABLE IF EXISTS speaker_follows;
+    DROP TABLE IF EXISTS user_availability;
     DROP TABLE IF EXISTS session_tags;
     DROP TABLE IF EXISTS session_speakers;
     DROP TABLE IF EXISTS sessions;

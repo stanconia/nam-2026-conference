@@ -1,14 +1,17 @@
 ---
 area: agenda
-summary: The attendee's own conference — the My Agenda preferences panel (topics), and the endpoints a team builds an agenda on (/users/:id/schedule and /today, the speaker's own sessions, the .ics exports), none of which has a UI yet.
+summary: The attendee's own conference — the My Agenda preferences panel (topics, availability, free-text interests), and the endpoints a team builds an agenda on (/users/:id/schedule and /today, the speaker's own sessions, the .ics exports), none of which has a UI yet.
 read_when: touching My Agenda, an attendee's day or schedule, suggestions, clashes or booked-hours totals, a speaker's own sessions, or calendar export
 files:
   - server/lib/agenda.js
   - server/lib/ical.js
+  - server/lib/availability.js
   - src/pages/MyAgendaPage.jsx
 tests:
   - tests/home.spec.js
   - tests/my-agenda.spec.js
+  - tests/api/availability.test.js
+  - tests/unit/availability.test.js
   - tests/api/interests.test.js
   - tests/api/interests-text.test.js
   - tests/my-agenda-interests-text.spec.js
@@ -30,7 +33,7 @@ follows the attendee switch, saved optimistically on each toggle by
 400 unless every entry is a topic tag name, 404 for an unknown attendee; stores
 de-duplicated names in `users.interests`, returns `toUser`). The page owns this state;
 `currentUser.interests` from bootstrap is stale after a save. Nothing else reads it yet.
-The second is `FreeTextSection` ("In your own words (optional)"): a textarea
+The third and last, after availability (below), is `FreeTextSection` ("In your own words (optional)"): a textarea
 (`interests-text`, `maxLength` 500, counter `interests-text-count`, `interests-text-save`, `interests-text-saved`)
 saved by `PUT /api/users/:id/interests-text` (`api.setInterestsText`, body `{ text }`;
 trimmed, `''` clears, 400 unless a string of at most `INTERESTS_TEXT_MAX` = 500 characters,
@@ -41,6 +44,18 @@ with matching functions in `src/lib/api.js`. What a day is made of is decided in
 `server/lib/agenda.js`; routes in `server/routes/users.js` only validate and call it.
 
 ## How it works
+
+**Availability** is the second section, `AvailabilitySection`, after topics. It lists
+each `days[]` entry with a checkbox (`availability-day-<date>`) and, once ticked, a
+from and to time (`availability-from-<date>`, `-to-`, `-clear-`). Every valid change
+saves at once with `api.setAvailability(userId, days)` →
+`PUT /api/users/:id/availability` `{ days: [{ day, from, to }] }`, which replaces the
+attendee's rows (`setAvailability`, `server/lib/availability.js`) and returns them;
+`GET /api/users/:id` carries them as `availability`. Both times or neither, `HH:MM`,
+end after start, a seeded day, no duplicates (`validateAvailability` → 400 with a
+message); the page shows the same message in `availability-error-<date>` and does not
+send the day's window. A ticked day with no window means the whole day; no days ticked
+means nothing stated. Nothing reads it yet.
 
 **`GET /api/users/:id/schedule`** → `{ user: toUser(row), days: scheduleFor(id) }`.
 Client: `api.getSchedule(userId)` — no UI calls it yet.
