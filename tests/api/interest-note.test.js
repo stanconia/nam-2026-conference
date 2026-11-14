@@ -69,7 +69,7 @@ describe('Interest note', () => {
     const id = 5;
     const marker = 'zq-unique-interest-marker';
     await api.put(path(id), { text: marker });
-    for (const p of ['/users', `/users/${id}`, `/users/${id}/schedule`, `/users/${id}/today`,
+    for (const p of ['/users', `/users/${id}`, `/users/${id}/schedule`, `/users/${id}/today?day=2026-01-01&time=10:00`,
       `/users/${id}/agenda.ics`, '/bootstrap', '/sessions', '/speakers']) {
       const res = await api.get(p);
       assert.equal(res.status, 200, p);
