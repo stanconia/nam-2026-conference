@@ -165,6 +165,70 @@ function TopicsSection({ userId }) {
   );
 }
 
+/** Followed speakers, read from and written to the store so profiles stay in step. */
+function SpeakersSection() {
+  const { isFollowing, toggleFollow } = useConference();
+  const toast = useToast();
+  const [speakers, setSpeakers] = useState(null);
+
+  useEffect(() => {
+    let live = true;
+    api.getSpeakers().then((s) => live && setSpeakers(s)).catch(() => live && setSpeakers([]));
+    return () => { live = false; };
+  }, []);
+
+  async function change(id) {
+    try {
+      await toggleFollow(id);
+    } catch (err) {
+      toast({ message: `Could not update your speakers: ${err.message}`, icon: 'alert' });
+    }
+  }
+
+  const list = speakers || [];
+  const followed = list.filter((s) => isFollowing(s.id));
+  const available = list.filter((s) => !isFollowing(s.id)).sort((a, b) => a.name.localeCompare(b.name));
+
+  return (
+    <section className="space-y-3" aria-labelledby="speakers-heading" data-testid="speakers-section">
+      <div>
+        <h2 id="speakers-heading" className="font-display text-xl">Speakers</h2>
+        <p className="mt-1 text-sm text-muted">Pick the speakers you want to see. This is the same list as Follow on their profiles.</p>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {followed.map((s) => (
+          <span
+            key={s.id}
+            data-testid={`speaker-chip-${s.id}`}
+            className="inline-flex items-center gap-1.5 rounded-full border border-violet-400/50 bg-violet-500/15 py-1 pl-3 pr-1 text-[12px] font-semibold text-ink"
+          >
+            {s.name}
+            <button
+              type="button"
+              onClick={() => change(s.id)}
+              aria-label={`Unfollow ${s.name}`}
+              data-testid={`speaker-remove-${s.id}`}
+              className="grid h-5 w-5 place-items-center rounded-full text-muted hover:bg-white/10 hover:text-ink"
+            >
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
+      <select
+        value=""
+        onChange={(e) => e.target.value && change(Number(e.target.value))}
+        aria-label="Add a speaker"
+        data-testid="speaker-picker"
+        className="w-full max-w-sm rounded-lg border border-hairline bg-raised px-3 py-2 text-sm text-ink"
+      >
+        <option value="">Add a speaker…</option>
+        {available.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+      </select>
+    </section>
+  );
+}
+
 const TEXT_MAX = 500;
 
 function FreeTextSection({ userId }) {
@@ -232,7 +296,7 @@ function FreeTextSection({ userId }) {
   );
 }
 
-const SECTIONS = [TopicsSection, AvailabilitySection, FreeTextSection];
+const SECTIONS = [TopicsSection, AvailabilitySection, SpeakersSection, FreeTextSection];
 
 function PreferencesPanel({ userId }) {
   return (
