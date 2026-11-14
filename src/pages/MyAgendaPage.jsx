@@ -67,7 +67,67 @@ function TopicsSection({ userId }) {
   );
 }
 
-const SECTIONS = [TopicsSection];
+function VenueSection({ userId }) {
+  const { venues = [] } = useConference();
+  const toast = useToast();
+  // undefined while loading; null means Either.
+  const [chosen, setChosen] = useState(undefined);
+
+  useEffect(() => {
+    let live = true;
+    setChosen(undefined);
+    api.getUser(userId).then((u) => live && setChosen(u.preferredVenueId)).catch(() => live && setChosen(null));
+    return () => { live = false; };
+  }, [userId]);
+
+  async function choose(venueId) {
+    const before = chosen;
+    if (venueId === before) return;
+    setChosen(venueId);
+    try {
+      await api.setPreferredVenue(userId, venueId);
+    } catch (err) {
+      setChosen(before);
+      toast({ message: `Could not save your venue: ${err.message}`, icon: 'alert' });
+    }
+  }
+
+  const options = [...venues.map((v) => ({ key: v.id, id: v.id, label: v.shortName })), { key: 'either', id: null, label: 'Either' }];
+
+  return (
+    <section className="space-y-3" aria-labelledby="venue-heading" data-testid="venue-section">
+      <div>
+        <h2 id="venue-heading" className="font-display text-xl">Venue</h2>
+        <p className="mt-1 text-sm text-muted">Which venue you would rather be at. Saved as you go.</p>
+      </div>
+      <div role="radiogroup" aria-labelledby="venue-heading" className="flex flex-wrap gap-1.5">
+        {chosen !== undefined && options.map((o) => {
+          const on = chosen === o.id;
+          return (
+            <button
+              key={o.key}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => choose(o.id)}
+              data-testid={`venue-option-${o.key}`}
+              className={cx(
+                'inline-flex items-center rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-all',
+                on
+                  ? 'border-violet-400/50 bg-violet-500/15 text-ink'
+                  : 'border-hairline bg-raised text-muted hover:border-white/20 hover:text-ink',
+              )}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+const SECTIONS = [TopicsSection, VenueSection];
 
 function PreferencesPanel({ userId }) {
   return (

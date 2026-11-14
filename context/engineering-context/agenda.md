@@ -10,6 +10,7 @@ tests:
   - tests/home.spec.js
   - tests/my-agenda.spec.js
   - tests/api/interests.test.js
+  - tests/api/preferred-venue.test.js
   - tests/api/agenda.test.js
   - tests/api/calendar.test.js
   - tests/unit/ical.test.js
@@ -28,6 +29,12 @@ follows the attendee switch, saved optimistically on each toggle by
 400 unless every entry is a topic tag name, 404 for an unknown attendee; stores
 de-duplicated names in `users.interests`, returns `toUser`). The page owns this state;
 `currentUser.interests` from bootstrap is stale after a save. Nothing else reads it yet.
+The **Venue** section (`VenueSection`) is a radiogroup: `venue-option-<venue id>` (label =
+venue `shortName` from `useConference().venues`) and `venue-option-either`, `aria-checked`
+marks the choice. `users.preferred_venue_id` (NULL = either, mapped to
+`preferredVenueId`) is saved by `PUT /api/users/:id/preferred-venue`
+(`api.setPreferredVenue`, body `{ venueId: id | null }`; 400 unless null or an existing
+venue id, 404 unknown attendee; returns `toUser`). Nothing else reads it yet.
 Everything else underneath is built and tested:
 adding a session takes a seat (seats doc), and the payloads below are served,
 with matching functions in `src/lib/api.js`. What a day is made of is decided in

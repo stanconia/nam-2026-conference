@@ -24,6 +24,8 @@ const myCheckIns = db.prepare('SELECT session_id FROM check_ins WHERE user_id = 
 const myRatings = db.prepare('SELECT session_id, stars FROM ratings WHERE user_id = ?');
 const topicNames = db.prepare("SELECT name FROM tags WHERE kind = 'topic'");
 const setInterests = db.prepare('UPDATE users SET interests = ? WHERE id = ?');
+const venueExists = db.prepare('SELECT 1 FROM venues WHERE id = ?');
+const setPreferredVenue = db.prepare('UPDATE users SET preferred_venue_id = ? WHERE id = ?');
 const follow = db.prepare('INSERT OR IGNORE INTO speaker_follows (user_id, speaker_id) VALUES (?, ?)');
 const unfollow = db.prepare('DELETE FROM speaker_follows WHERE user_id = ? AND speaker_id = ?');
 
@@ -58,6 +60,17 @@ usersRouter.put('/:id/interests', (req, res) => {
     return res.status(400).json({ error: 'interests must be a list of topic tag names' });
   }
   setInterests.run([...new Set(interests)].join(','), req.params.id);
+  res.json(toUser(getUser.get(req.params.id)));
+});
+
+/** Set the attendee's preferred venue: a venue id, or null for either. */
+usersRouter.put('/:id/preferred-venue', (req, res) => {
+  if (!userExists.get(req.params.id)) return res.status(404).json({ error: 'Attendee not found' });
+  const { venueId } = req.body ?? {};
+  if (venueId !== null && !(Number.isInteger(venueId) && venueExists.get(venueId))) {
+    return res.status(400).json({ error: 'venueId must be a venue id or null' });
+  }
+  setPreferredVenue.run(venueId, req.params.id);
   res.json(toUser(getUser.get(req.params.id)));
 });
 
