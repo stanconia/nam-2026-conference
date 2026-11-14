@@ -30,7 +30,7 @@ Approximate counts from a fresh seed. The tables attendees write to drift as you
 | `sessions` | ~140 | 4 days × 7 slots × 5 rooms (a few slots left empty), plus a keynote and a social each day |
 | `session_speakers` | ~195 | Many-to-many, with a `role` (Speaker / Moderator / Host) |
 | `session_tags` | ~980 | Many-to-many |
-| `users` | 6 | Attendees. No passwords — there is no auth |
+| `users` | 6 | Attendees. No passwords — there is no auth. `preferred_venue_id` is nullable (NULL = either) |
 | `reservations` | ~60 | An attendee's agenda. Holds a real seat; `status` is `confirmed` or `waitlisted` |
 | `speaker_follows` | ~20 | Follow button on a speaker's profile; only the speaker pages read it |
 | `user_availability` | 0, grows | Days an attendee can attend, with an optional `from_time`/`to_time` window (`HH:MM`); one row per ticked day |

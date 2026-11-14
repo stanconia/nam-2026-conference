@@ -45,6 +45,8 @@ export const setAvailability = (userId, days) =>
   api(`/users/${userId}/availability`, { method: 'PUT', body: JSON.stringify({ days }) });
 export const setInterests = (userId, interests) =>
   api(`/users/${userId}/interests`, { method: 'PUT', body: JSON.stringify({ interests }) });
+export const setPreferredVenue = (userId, venueId) =>
+  api(`/users/${userId}/preferred-venue`, { method: 'PUT', body: JSON.stringify({ venueId }) });
 export const setInterestsText = (userId, text) =>
   api(`/users/${userId}/interests-text`, { method: 'PUT', body: JSON.stringify({ text }) });
 export const getSchedule = (userId) => api(`/users/${userId}/schedule`);

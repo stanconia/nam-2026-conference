@@ -195,7 +195,7 @@ describe('Every endpoint answers', () => {
       'PUT users/:id/ratings/:sessionId', 'PUT users/:id/follows/:speakerId',
       'PUT users/:id/availability',
       'PUT users/:id/interests',
-      'PUT users/:id/interests-text',
+      'PUT users/:id/interests-text', 'PUT users/:id/preferred-venue',
       'DELETE users/:id/reservations/:sessionId', 'DELETE users/:id/follows/:speakerId',
     ];
 

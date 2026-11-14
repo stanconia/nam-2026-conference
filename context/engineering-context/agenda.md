@@ -13,6 +13,7 @@ tests:
   - tests/api/availability.test.js
   - tests/unit/availability.test.js
   - tests/api/interests.test.js
+  - tests/api/preferred-venue.test.js
   - tests/api/interests-text.test.js
   - tests/my-agenda-interests-text.spec.js
   - tests/api/agenda.test.js
@@ -33,12 +34,18 @@ follows the attendee switch, saved optimistically on each toggle by
 400 unless every entry is a topic tag name, 404 for an unknown attendee; stores
 de-duplicated names in `users.interests`, returns `toUser`). The page owns this state;
 `currentUser.interests` from bootstrap is stale after a save. Nothing else reads it yet.
-The third, after availability (below), is `SpeakersSection` (`speakers-section`): it reads and writes the store's
+The third, after availability (below), is the **Venue** section (`VenueSection`), a radiogroup: `venue-option-<venue id>` (label =
+venue `shortName` from `useConference().venues`) and `venue-option-either`, `aria-checked`
+marks the choice. `users.preferred_venue_id` (NULL = either, mapped to
+`preferredVenueId`) is saved by `PUT /api/users/:id/preferred-venue`
+(`api.setPreferredVenue`, body `{ venueId: id | null }`; 400 unless null or an existing
+venue id, 404 unknown attendee; returns `toUser`). Nothing else reads it yet.
+The fourth is `SpeakersSection` (`speakers-section`): it reads and writes the store's
 follow state (`isFollowing`, `toggleFollow`), so it and the speaker profile's Follow button
 always agree. Followed speakers are chips (`speaker-chip-<id>`, remove `speaker-remove-<id>`);
 a native `<select data-testid="speaker-picker">` lists only the programme's unfollowed
 speakers from `api.getSpeakers()`, so nothing outside the programme can be picked.
-The fourth and last is `FreeTextSection` ("In your own words (optional)"): a textarea
+The fifth and last is `FreeTextSection` ("In your own words (optional)"): a textarea
 (`interests-text`, `maxLength` 500, counter `interests-text-count`, `interests-text-save`, `interests-text-saved`)
 saved by `PUT /api/users/:id/interests-text` (`api.setInterestsText`, body `{ text }`;
 trimmed, `''` clears, 400 unless a string of at most `INTERESTS_TEXT_MAX` = 500 characters,
