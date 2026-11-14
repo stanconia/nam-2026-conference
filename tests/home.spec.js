@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { API, visit, momentOn, conferenceDays, ATTENDEES } from './helpers.js';
+import { API, visit, momentOn, conferenceDays, ATTENDEES, laneFor, shotForPR } from './helpers.js';
 
 
 test.describe('Home is a way in, not a feed', () => {
@@ -60,5 +60,42 @@ test.describe('My Agenda', () => {
     await visit(page, '/my-plan');
     await expect(page).toHaveURL(/\/my-agenda$/);
     await expect(page.getByTestId('preferences-panel')).toBeVisible();
+  });
+});
+
+test.describe('Interests box', () => {
+  test('saves, survives reload, edits, clears, counts, and is the same text as My Agenda', async ({ page, request }, testInfo) => {
+    const lane = await laneFor('home.interests', testInfo);
+    await request.put(`${API}/users/${lane.user}/interests-text`, { data: { text: '' } });
+
+    await visit(page, '/', { as: lane.user });
+    const input = page.getByTestId('interests-input');
+    await expect(page.getByTestId('interests-box')).toBeVisible();
+    await expect(page.getByTestId('interests-remaining')).toHaveText('500 left');
+
+    await input.fill('Rust and rockets');
+    await expect(page.getByTestId('interests-remaining')).toHaveText('484 left');
+    await input.fill('x'.repeat(501));
+    await expect(page.getByTestId('interests-remaining')).toHaveText('-1 left');
+    await expect(page.getByTestId('interests-save')).toBeDisabled();
+
+    await input.fill('uniqueinterestmarker one');
+    await page.getByTestId('interests-save').click();
+    await page.reload();
+    await expect(input).toHaveValue('uniqueinterestmarker one');
+    await shotForPR(page, 'Interests box on Home');
+
+    await input.fill('uniqueinterestmarker two');
+    await page.getByTestId('interests-save').click();
+    await page.reload();
+    await expect(input).toHaveValue('uniqueinterestmarker two');
+
+    await page.goto('/my-agenda');
+    await expect(page.getByTestId('free-text-section').locator('textarea')).toHaveValue('uniqueinterestmarker two');
+    await page.goto('/');
+    await page.getByTestId('interests-clear').click();
+    await page.reload();
+    await expect(input).toHaveValue('');
+    await expect(page.getByTestId('interests-remaining')).toHaveText('500 left');
   });
 });
