@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS users (
   timezone    TEXT NOT NULL DEFAULT 'America/Los_Angeles',
   ticket_tier TEXT NOT NULL DEFAULT 'Standard',
   interests   TEXT NOT NULL DEFAULT '',
+  interests_text TEXT NOT NULL DEFAULT '',
   -- Attendees who are also presenting link to their speakers row.
   speaker_id  INTEGER REFERENCES speakers(id)
 );

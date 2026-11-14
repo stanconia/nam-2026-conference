@@ -43,6 +43,8 @@ export const getAnnouncements = () => api('/announcements');
 export const getUser = (id) => api(`/users/${id}`);
 export const setInterests = (userId, interests) =>
   api(`/users/${userId}/interests`, { method: 'PUT', body: JSON.stringify({ interests }) });
+export const setInterestsText = (userId, text) =>
+  api(`/users/${userId}/interests-text`, { method: 'PUT', body: JSON.stringify({ text }) });
 export const getSchedule = (userId) => api(`/users/${userId}/schedule`);
 export const getToday = (userId, { day, time }) => api(`/users/${userId}/today${qs({ day, time })}`);
 
