@@ -198,6 +198,9 @@ export const toUser = (row, extra = {}) => ({
   ...extra,
 });
 
+/** One ticked day: a null window means the whole day. */
+export const toAvailability = (row) => ({ day: row.day, from: row.from_time, to: row.to_time });
+
 export const toAnnouncement = (row) => ({
   id: row.id, title: row.title, body: row.body, kind: row.kind,
   venueId: row.venue_id, postedAt: row.posted_at, pinned: !!row.pinned,
