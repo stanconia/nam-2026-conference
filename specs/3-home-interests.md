@@ -28,7 +28,11 @@ endpoint, so no other page, payload or `.ics` carries it; My Agenda is untouched
 | API test and spec, each with own lane | `interest-note.test.js` (own attendee per test, throwaway DB); `home.interests` lane | API + spec |
 
 ## Decisions
-None of the Done-when criteria already holds on main (no box, endpoint or table exists).
+No Done-when criterion already holds on main (no box, endpoint or table exists).
+- The text lives in its own table behind `GET`/`PUT /api/users/:id/interest-note`, not in `users.interests` (existing seeded tags, already in every `/users` payload).
+- The 500 limit counts characters (Array.from), so an emoji is one.
+- A blank or whitespace-only save clears the text.
+- "Zero seats" is proved at the API (`clearAgenda`) plus the box rendering with no seat read, not by emptying a seeded attendee's whole plan in the browser.
 
 ## Out of scope
 Using the text anywhere (My Agenda, suggestions, Home), tag-style `users.interests`, authentication.
