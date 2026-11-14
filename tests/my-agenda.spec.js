@@ -38,3 +38,32 @@ test('topics can be chosen, survive a reload and follow the attendee', async ({ 
     await request.put(`${API}/users/${ATTENDEES.marcus}/interests`, { data: { interests: original } });
   }
 });
+
+test('venue preference: three choices, Either by default, saved and per attendee', async ({ page, request }) => {
+  const { venues } = await (await request.get(`${API}/bootstrap`)).json();
+  const optionFor = (id) => page.getByTestId(`venue-option-${id}`);
+  const as = ATTENDEES.kenji;
+
+  try {
+    await visit(page, '/my-agenda', { as });
+    await expect(page.locator('[data-testid^="venue-option-"]')).toHaveCount(venues.length + 1);
+    for (const v of venues) await expect(optionFor(v.id)).toHaveText(v.shortName);
+    await expect(optionFor('either')).toHaveText('Either');
+    await expect(optionFor('either')).toHaveAttribute('aria-checked', 'true');
+
+    await optionFor(venues[0].id).click();
+    await expect(optionFor(venues[0].id)).toHaveAttribute('aria-checked', 'true');
+    await expect(optionFor('either')).toHaveAttribute('aria-checked', 'false');
+    await shotForPR(page, 'My Agenda venue preference selected');
+
+    await page.reload();
+    await expect(optionFor(venues[0].id)).toHaveAttribute('aria-checked', 'true');
+
+    await visit(page, '/my-agenda', { as: ATTENDEES.sofia });
+    await expect(optionFor('either')).toHaveAttribute('aria-checked', 'true');
+    await visit(page, '/my-agenda', { as });
+    await expect(optionFor(venues[0].id)).toHaveAttribute('aria-checked', 'true');
+  } finally {
+    await request.put(`${API}/users/${as}/preferred-venue`, { data: { venueId: null } });
+  }
+});
