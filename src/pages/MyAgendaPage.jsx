@@ -165,7 +165,74 @@ function TopicsSection({ userId }) {
   );
 }
 
-const SECTIONS = [TopicsSection, AvailabilitySection];
+const TEXT_MAX = 500;
+
+function FreeTextSection({ userId }) {
+  const toast = useToast();
+  const [saved, setSaved] = useState(null);
+  const [text, setText] = useState('');
+  const [justSaved, setJustSaved] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    setSaved(null);
+    setText('');
+    setJustSaved(false);
+    api.getUser(userId)
+      .then((u) => { if (live) { setSaved(u.interestsText); setText(u.interestsText); } })
+      .catch(() => { if (live) setSaved(''); });
+    return () => { live = false; };
+  }, [userId]);
+
+  async function save() {
+    try {
+      const u = await api.setInterestsText(userId, text);
+      setSaved(u.interestsText);
+      setText(u.interestsText);
+      setJustSaved(true);
+    } catch (err) {
+      toast({ message: `Could not save your interests: ${err.message}`, icon: 'alert' });
+    }
+  }
+
+  const dirty = saved !== null && text.trim() !== saved;
+
+  return (
+    <section className="space-y-3" aria-labelledby="free-text-heading" data-testid="free-text-section">
+      <div>
+        <h2 id="free-text-heading" className="font-display text-xl">
+          In your own words <span className="text-sm font-normal text-muted">(optional)</span>
+        </h2>
+        <p className="mt-1 text-sm text-muted">Anything else about what you hope to get out of the conference.</p>
+      </div>
+      <textarea
+        value={text}
+        onChange={(e) => { setText(e.target.value); setJustSaved(false); }}
+        maxLength={TEXT_MAX}
+        rows={4}
+        disabled={saved === null}
+        aria-labelledby="free-text-heading"
+        data-testid="interests-text"
+        className="w-full rounded-xl border border-hairline bg-raised p-3 text-sm text-ink"
+      />
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={save}
+          disabled={!dirty}
+          data-testid="interests-text-save"
+          className="rounded-full border border-violet-400/50 bg-violet-500/15 px-4 py-1.5 text-[12px] font-semibold text-ink disabled:opacity-50"
+        >
+          Save
+        </button>
+        {justSaved && !dirty && <span className="text-sm text-muted" data-testid="interests-text-saved">Saved</span>}
+        <span className="ml-auto text-xs text-muted" data-testid="interests-text-count">{text.length} / {TEXT_MAX}</span>
+      </div>
+    </section>
+  );
+}
+
+const SECTIONS = [TopicsSection, AvailabilitySection, FreeTextSection];
 
 function PreferencesPanel({ userId }) {
   return (

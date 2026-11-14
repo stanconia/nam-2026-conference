@@ -1,6 +1,6 @@
 ---
 area: agenda
-summary: The attendee's own conference — the My Agenda preferences panel (topics, availability), and the endpoints a team builds an agenda on (/users/:id/schedule and /today, the speaker's own sessions, the .ics exports), none of which has a UI yet.
+summary: The attendee's own conference — the My Agenda preferences panel (topics, availability, free-text interests), and the endpoints a team builds an agenda on (/users/:id/schedule and /today, the speaker's own sessions, the .ics exports), none of which has a UI yet.
 read_when: touching My Agenda, an attendee's day or schedule, suggestions, clashes or booked-hours totals, a speaker's own sessions, or calendar export
 files:
   - server/lib/agenda.js
@@ -13,6 +13,8 @@ tests:
   - tests/api/availability.test.js
   - tests/unit/availability.test.js
   - tests/api/interests.test.js
+  - tests/api/interests-text.test.js
+  - tests/my-agenda-interests-text.spec.js
   - tests/api/agenda.test.js
   - tests/api/calendar.test.js
   - tests/unit/ical.test.js
@@ -31,6 +33,11 @@ follows the attendee switch, saved optimistically on each toggle by
 400 unless every entry is a topic tag name, 404 for an unknown attendee; stores
 de-duplicated names in `users.interests`, returns `toUser`). The page owns this state;
 `currentUser.interests` from bootstrap is stale after a save. Nothing else reads it yet.
+The third and last, after availability (below), is `FreeTextSection` ("In your own words (optional)"): a textarea
+(`interests-text`, `maxLength` 500, counter `interests-text-count`, `interests-text-save`, `interests-text-saved`)
+saved by `PUT /api/users/:id/interests-text` (`api.setInterestsText`, body `{ text }`;
+trimmed, `''` clears, 400 unless a string of at most `INTERESTS_TEXT_MAX` = 500 characters,
+404 for an unknown attendee), stored in `users.interests_text` and served as `interestsText`.
 Everything else underneath is built and tested:
 adding a session takes a seat (seats doc), and the payloads below are served,
 with matching functions in `src/lib/api.js`. What a day is made of is decided in
