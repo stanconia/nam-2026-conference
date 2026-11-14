@@ -1,6 +1,6 @@
 ---
 area: agenda
-summary: The attendee's own conference — the My Agenda preferences panel (topics), and the endpoints a team builds an agenda on (/users/:id/schedule and /today, the speaker's own sessions, the .ics exports), none of which has a UI yet.
+summary: The attendee's own conference — the My Agenda preferences panel (topics, availability), and the endpoints a team builds an agenda on (/users/:id/schedule and /today, the speaker's own sessions, the .ics exports), none of which has a UI yet.
 read_when: touching My Agenda, an attendee's day or schedule, suggestions, clashes or booked-hours totals, a speaker's own sessions, or calendar export
 files:
   - server/lib/agenda.js
@@ -38,7 +38,7 @@ with matching functions in `src/lib/api.js`. What a day is made of is decided in
 
 ## How it works
 
-**Availability** is the one personal input on My Agenda: `AvailabilitySection` lists
+**Availability** is the second section, `AvailabilitySection`, after topics. It lists
 each `days[]` entry with a checkbox (`availability-day-<date>`) and, once ticked, a
 from and to time (`availability-from-<date>`, `-to-`, `-clear-`). Every valid change
 saves at once with `api.setAvailability(userId, days)` →
