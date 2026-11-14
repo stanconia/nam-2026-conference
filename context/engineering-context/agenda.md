@@ -5,9 +5,13 @@ read_when: touching My Agenda, an attendee's day or schedule, suggestions, clash
 files:
   - server/lib/agenda.js
   - server/lib/ical.js
+  - server/lib/availability.js
   - src/pages/MyAgendaPage.jsx
 tests:
   - tests/home.spec.js
+  - tests/my-agenda.spec.js
+  - tests/api/availability.test.js
+  - tests/unit/availability.test.js
   - tests/api/agenda.test.js
   - tests/api/calendar.test.js
   - tests/unit/ical.test.js
@@ -25,6 +29,18 @@ with matching functions in `src/lib/api.js`. What a day is made of is decided in
 `server/lib/agenda.js`; routes in `server/routes/users.js` only validate and call it.
 
 ## How it works
+
+**Availability** is the one personal input on My Agenda: `AvailabilitySection` lists
+each `days[]` entry with a checkbox (`availability-day-<date>`) and, once ticked, a
+from and to time (`availability-from-<date>`, `-to-`, `-clear-`). Every valid change
+saves at once with `api.setAvailability(userId, days)` →
+`PUT /api/users/:id/availability` `{ days: [{ day, from, to }] }`, which replaces the
+attendee's rows (`setAvailability`, `server/lib/availability.js`) and returns them;
+`GET /api/users/:id` carries them as `availability`. Both times or neither, `HH:MM`,
+end after start, a seeded day, no duplicates (`validateAvailability` → 400 with a
+message); the page shows the same message in `availability-error-<date>` and does not
+send the day's window. A ticked day with no window means the whole day; no days ticked
+means nothing stated. Nothing reads it yet.
 
 **`GET /api/users/:id/schedule`** → `{ user: toUser(row), days: scheduleFor(id) }`.
 Client: `api.getSchedule(userId)` — no UI calls it yet.
