@@ -36,6 +36,9 @@ CREATE TABLE IF NOT EXISTS users (
   timezone    TEXT NOT NULL DEFAULT 'America/Los_Angeles',
   ticket_tier TEXT NOT NULL DEFAULT 'Standard',
   interests   TEXT NOT NULL DEFAULT '',
+  -- NULL means no preference ("either").
+  preferred_venue_id INTEGER REFERENCES venues(id),
+  interests_text TEXT NOT NULL DEFAULT '',
   -- Attendees who are also presenting link to their speakers row.
   speaker_id  INTEGER REFERENCES speakers(id)
 );
@@ -195,12 +198,12 @@ CREATE TABLE IF NOT EXISTS speaker_follows (
   PRIMARY KEY (user_id, speaker_id)
 );
 
--- Free text an attendee wrote about themselves. Its own table so no users
--- payload carries it; only /users/:id/interest-note reads it.
-CREATE TABLE IF NOT EXISTS interest_notes (
-  user_id    INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-  body       TEXT NOT NULL,
-  updated_at TEXT
+CREATE TABLE IF NOT EXISTS user_availability (
+  user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  day       TEXT NOT NULL,
+  from_time TEXT,
+  to_time   TEXT,
+  PRIMARY KEY (user_id, day)
 );
 
 CREATE TABLE IF NOT EXISTS ratings (
@@ -274,11 +277,11 @@ export function migrate() {
 export function dropAll() {
   db.pragma('foreign_keys = OFF');
   db.exec(`
-    DROP TABLE IF EXISTS interest_notes;
     DROP TABLE IF EXISTS ratings;
     DROP TABLE IF EXISTS check_ins;
     DROP TABLE IF EXISTS reservations;
     DROP TABLE IF EXISTS speaker_follows;
+    DROP TABLE IF EXISTS user_availability;
     DROP TABLE IF EXISTS session_tags;
     DROP TABLE IF EXISTS session_speakers;
     DROP TABLE IF EXISTS sessions;

@@ -41,6 +41,14 @@ export const getVendors = (filters) => api(`/vendors${qs(filters)}`);
 export const getSponsors = () => api('/sponsors');
 export const getAnnouncements = () => api('/announcements');
 export const getUser = (id) => api(`/users/${id}`);
+export const setAvailability = (userId, days) =>
+  api(`/users/${userId}/availability`, { method: 'PUT', body: JSON.stringify({ days }) });
+export const setInterests = (userId, interests) =>
+  api(`/users/${userId}/interests`, { method: 'PUT', body: JSON.stringify({ interests }) });
+export const setPreferredVenue = (userId, venueId) =>
+  api(`/users/${userId}/preferred-venue`, { method: 'PUT', body: JSON.stringify({ venueId }) });
+export const setInterestsText = (userId, text) =>
+  api(`/users/${userId}/interests-text`, { method: 'PUT', body: JSON.stringify({ text }) });
 export const getSchedule = (userId) => api(`/users/${userId}/schedule`);
 export const getToday = (userId, { day, time }) => api(`/users/${userId}/today${qs({ day, time })}`);
 
@@ -60,8 +68,5 @@ export const rateSession = (userId, sessionId, payload) =>
 export const agendaCalendarUrl = (userId) => `/api/users/${userId}/agenda.ics`;
 export const sessionCalendarUrl = (sessionId) => `/api/sessions/${sessionId}.ics`;
 
-export const getInterestNote = (userId) => api(`/users/${userId}/interest-note`);
-export const saveInterestNote = (userId, text) =>
-  api(`/users/${userId}/interest-note`, { method: 'PUT', body: JSON.stringify({ text }) });
 export const followSpeaker = (userId, speakerId) => api(`/users/${userId}/follows/${speakerId}`, { method: 'PUT' });
 export const unfollowSpeaker = (userId, speakerId) => api(`/users/${userId}/follows/${speakerId}`, { method: 'DELETE' });

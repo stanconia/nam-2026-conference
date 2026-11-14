@@ -44,8 +44,8 @@ test.describe('Home is a way in, not a feed', () => {
   });
 });
 
-test.describe('My Agenda is a blank canvas', () => {
-  test('it says it is coming soon, and is still in the nav', async ({ page }, testInfo) => {
+test.describe('My Agenda', () => {
+  test('is in the nav, and /my-plan redirects to it', async ({ page }, testInfo) => {
     await visit(page, '/');
     // Desktop shows the main nav; a phone hides it behind the menu button.
     if (testInfo.project.name === 'mobile') {
@@ -55,19 +55,18 @@ test.describe('My Agenda is a blank canvas', () => {
       await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: /My Agenda/ }).click();
     }
     await expect(page).toHaveURL(/\/my-agenda$/);
-    await expect(page.getByTestId('agenda-coming-soon')).toContainText('Coming soon');
+    await expect(page.getByTestId('preferences-panel')).toBeVisible();
 
     await visit(page, '/my-plan');
     await expect(page).toHaveURL(/\/my-agenda$/);
-    await expect(page.getByTestId('agenda-coming-soon')).toBeVisible();
+    await expect(page.getByTestId('preferences-panel')).toBeVisible();
   });
 });
 
 test.describe('Interests box', () => {
-  test('saves, survives reload, edits, clears, counts, and stays off My Agenda', async ({ page, request }, testInfo) => {
+  test('saves, survives reload, edits, clears, counts, and is the same text as My Agenda', async ({ page, request }, testInfo) => {
     const lane = await laneFor('home.interests', testInfo);
-    const note = `${API}/users/${lane.user}/interest-note`;
-    await request.put(note, { data: { text: '' } });
+    await request.put(`${API}/users/${lane.user}/interests-text`, { data: { text: '' } });
 
     await visit(page, '/', { as: lane.user });
     const input = page.getByTestId('interests-input');
@@ -92,7 +91,7 @@ test.describe('Interests box', () => {
     await expect(input).toHaveValue('uniqueinterestmarker two');
 
     await page.goto('/my-agenda');
-    await expect(page.getByRole('main')).not.toContainText('uniqueinterestmarker');
+    await expect(page.getByTestId('free-text-section').locator('textarea')).toHaveValue('uniqueinterestmarker two');
     await page.goto('/');
     await page.getByTestId('interests-clear').click();
     await page.reload();

@@ -1,13 +1,21 @@
 ---
 area: agenda
-summary: The attendee's own conference — the My Agenda placeholder page, and the endpoints a team builds an agenda on (/users/:id/schedule and /today, the speaker's own sessions, the .ics exports), none of which has a UI yet.
+summary: The attendee's own conference — the My Agenda preferences panel (topics, availability, free-text interests), and the endpoints a team builds an agenda on (/users/:id/schedule and /today, the speaker's own sessions, the .ics exports), none of which has a UI yet.
 read_when: touching My Agenda, an attendee's day or schedule, suggestions, clashes or booked-hours totals, a speaker's own sessions, or calendar export
 files:
   - server/lib/agenda.js
   - server/lib/ical.js
+  - server/lib/availability.js
   - src/pages/MyAgendaPage.jsx
 tests:
   - tests/home.spec.js
+  - tests/my-agenda.spec.js
+  - tests/api/availability.test.js
+  - tests/unit/availability.test.js
+  - tests/api/interests.test.js
+  - tests/api/preferred-venue.test.js
+  - tests/api/interests-text.test.js
+  - tests/my-agenda-interests-text.spec.js
   - tests/api/agenda.test.js
   - tests/api/calendar.test.js
   - tests/unit/ical.test.js
@@ -16,15 +24,50 @@ related: [seats, attendance, clock, venues, schedule, speakers, ui]
 
 # Agenda
 
-**My Agenda is a placeholder.** `/my-agenda` (`MyAgendaPage`, still in the nav,
-`/my-plan` redirects there) renders a `SectionHeader` and a "Coming soon" panel
-(`agenda-coming-soon`) with a `Browse the schedule` button — nothing else. Workshop
-teams design the page from scratch. Everything underneath it is built and tested:
+**My Agenda is a preferences panel.** `/my-agenda` (`MyAgendaPage`, in the nav,
+`/my-plan` redirects there) renders `PreferencesPanel` (`preferences-panel`), a list of
+small section components (`SECTIONS`) so more inputs can be added. The first is
+`TopicsSection`: one toggle chip per topic-kind tag from `useConference().tags`
+(`topic-chip-<slug>`, `aria-pressed`), loaded with `api.getUser(currentUserId)` so it
+follows the attendee switch, saved optimistically on each toggle by
+`PUT /api/users/:id/interests` (`api.setInterests`, body `{ interests: [tag name…] }`,
+400 unless every entry is a topic tag name, 404 for an unknown attendee; stores
+de-duplicated names in `users.interests`, returns `toUser`). The page owns this state;
+`currentUser.interests` from bootstrap is stale after a save. Nothing else reads it yet.
+The third, after availability (below), is the **Venue** section (`VenueSection`), a radiogroup: `venue-option-<venue id>` (label =
+venue `shortName` from `useConference().venues`) and `venue-option-either`, `aria-checked`
+marks the choice. `users.preferred_venue_id` (NULL = either, mapped to
+`preferredVenueId`) is saved by `PUT /api/users/:id/preferred-venue`
+(`api.setPreferredVenue`, body `{ venueId: id | null }`; 400 unless null or an existing
+venue id, 404 unknown attendee; returns `toUser`). Nothing else reads it yet.
+The fourth is `SpeakersSection` (`speakers-section`): it reads and writes the store's
+follow state (`isFollowing`, `toggleFollow`), so it and the speaker profile's Follow button
+always agree. Followed speakers are chips (`speaker-chip-<id>`, remove `speaker-remove-<id>`);
+a native `<select data-testid="speaker-picker">` lists only the programme's unfollowed
+speakers from `api.getSpeakers()`, so nothing outside the programme can be picked.
+The fifth and last is `FreeTextSection` ("In your own words (optional)"): a textarea
+(`interests-text`, `maxLength` 500, counter `interests-text-count`, `interests-text-save`, `interests-text-saved`)
+saved by `PUT /api/users/:id/interests-text` (`api.setInterestsText`, body `{ text }`;
+trimmed, `''` clears, 400 unless a string of at most `INTERESTS_TEXT_MAX` = 500 characters,
+404 for an unknown attendee), stored in `users.interests_text` and served as `interestsText`.
+Everything else underneath is built and tested:
 adding a session takes a seat (seats doc), and the payloads below are served,
 with matching functions in `src/lib/api.js`. What a day is made of is decided in
 `server/lib/agenda.js`; routes in `server/routes/users.js` only validate and call it.
 
 ## How it works
+
+**Availability** is the second section, `AvailabilitySection`, after topics. It lists
+each `days[]` entry with a checkbox (`availability-day-<date>`) and, once ticked, a
+from and to time (`availability-from-<date>`, `-to-`, `-clear-`). Every valid change
+saves at once with `api.setAvailability(userId, days)` →
+`PUT /api/users/:id/availability` `{ days: [{ day, from, to }] }`, which replaces the
+attendee's rows (`setAvailability`, `server/lib/availability.js`) and returns them;
+`GET /api/users/:id` carries them as `availability`. Both times or neither, `HH:MM`,
+end after start, a seeded day, no duplicates (`validateAvailability` → 400 with a
+message); the page shows the same message in `availability-error-<date>` and does not
+send the day's window. A ticked day with no window means the whole day; no days ticked
+means nothing stated. Nothing reads it yet.
 
 **`GET /api/users/:id/schedule`** → `{ user: toUser(row), days: scheduleFor(id) }`.
 Client: `api.getSchedule(userId)` — no UI calls it yet.

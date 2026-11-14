@@ -1,32 +1,379 @@
+import { useEffect, useState } from 'react';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
-import { Button, SectionHeader } from '../components/ui.jsx';
-import { Icon } from '../components/Icon.jsx';
+import { useConference } from '../lib/store.jsx';
+import { dayLabel } from '../lib/format.js';
+import { useToast } from '../components/Toaster.jsx';
+import { Button, SectionHeader, cx } from '../components/ui.jsx';
+import * as api from '../lib/api.js';
+
+/** Why a from/to pair cannot be saved, or null. Mirrors `validateAvailability` on the server. */
+const windowProblem = ({ from, to }) => {
+  if (!from && !to) return null;
+  if (!from || !to) return 'Set both a start and an end, or neither';
+  if (to <= from) return 'The end must be after the start';
+  return null;
+};
+
+/** Which days the attendee can attend, and optionally between which hours. Saves on every valid change. */
+function AvailabilitySection() {
+  const { days = [], currentUserId } = useConference();
+  const [drafts, setDrafts] = useState({});   // date -> { from, to }, present only for ticked days
+  const [errors, setErrors] = useState({});
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setLoaded(false); setDrafts({}); setErrors({});
+    api.getUser(currentUserId).then((u) => {
+      if (!active) return;
+      setDrafts(Object.fromEntries((u.availability ?? []).map((a) => [a.day, { from: a.from ?? '', to: a.to ?? '' }])));
+      setLoaded(true);
+    }).catch(() => active && setLoaded(true));
+    return () => { active = false; };
+  }, [currentUserId]);
+
+  const save = async (next, date) => {
+    const problem = date && next[date] ? windowProblem(next[date]) : null;
+    setDrafts(next);
+    setErrors((e) => ({ ...e, [date]: problem }));
+    if (problem) return;
+    const body = Object.entries(next)
+      .filter(([d, w]) => !windowProblem(w))
+      .map(([day, w]) => ({ day, from: w.from || null, to: w.to || null }));
+    try {
+      await api.setAvailability(currentUserId, body);
+    } catch (err) {
+      setErrors((e) => ({ ...e, [date]: err.message }));
+    }
+  };
+
+  const toggle = (date) => {
+    const next = { ...drafts };
+    if (next[date]) delete next[date]; else next[date] = { from: '', to: '' };
+    save(next, date);
+  };
+  const setWindow = (date, patch) => save({ ...drafts, [date]: { ...drafts[date], ...patch } }, date);
+
+  return (
+    <section className="space-y-3" data-testid="availability-section" aria-labelledby="availability-title">
+      <h2 id="availability-title" className="font-display text-xl">Availability</h2>
+      <p className="text-sm text-muted">Tick the days you can attend. Add hours if you are only free for part of a day.</p>
+      <ul className="space-y-3">
+        {days.map((d) => {
+          const w = drafts[d.date];
+          return (
+            <li key={d.date} className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <label className="flex min-w-48 items-center gap-2 text-sm">
+                <input
+                  type="checkbox" checked={!!w} disabled={!loaded} onChange={() => toggle(d.date)}
+                  data-testid={`availability-day-${d.date}`}
+                />
+                <span><strong>{d.label}</strong> · {dayLabel(d.date)}</span>
+              </label>
+              {w && (
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <input
+                    type="time" aria-label={`From, ${dayLabel(d.date)}`} value={w.from}
+                    onChange={(e) => setWindow(d.date, { from: e.target.value })}
+                    className="rounded-md border border-hairline bg-transparent px-2 py-1"
+                    data-testid={`availability-from-${d.date}`}
+                  />
+                  <span className="text-muted">to</span>
+                  <input
+                    type="time" aria-label={`To, ${dayLabel(d.date)}`} value={w.to}
+                    onChange={(e) => setWindow(d.date, { to: e.target.value })}
+                    className="rounded-md border border-hairline bg-transparent px-2 py-1"
+                    data-testid={`availability-to-${d.date}`}
+                  />
+                  {(w.from || w.to) && (
+                    <Button size="sm" onClick={() => setWindow(d.date, { from: '', to: '' })} data-testid={`availability-clear-${d.date}`}>
+                      Clear hours
+                    </Button>
+                  )}
+                </div>
+              )}
+              {errors[d.date] && (
+                <p role="alert" className="basis-full text-sm text-rose-400" data-testid={`availability-error-${d.date}`}>{errors[d.date]}</p>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
 
 /**
- * Deliberately empty. Workshop teams design this page from scratch, so it
- * holds no opinion about what an agenda should be. The rules and data are all
- * still there: adding a session takes a seat, and `/users/:id/schedule`,
- * `/users/:id/today` and the `.ics` exports are wired up in `lib/api.js`.
+ * The attendee's preferences. Each section is a small component below, so
+ * availability, venue, speakers or free text can be added to SECTIONS later.
+ * The page owns its own state: nothing else reads `interests`.
  */
+function TopicsSection({ userId }) {
+  const { tags = [] } = useConference();
+  const toast = useToast();
+  const topics = tags.filter((t) => t.kind === 'topic');
+  const [chosen, setChosen] = useState(null);
+
+  useEffect(() => {
+    let live = true;
+    setChosen(null);
+    api.getUser(userId).then((u) => live && setChosen(u.interests)).catch(() => live && setChosen([]));
+    return () => { live = false; };
+  }, [userId]);
+
+  async function toggle(name) {
+    const before = chosen;
+    const next = before.includes(name) ? before.filter((n) => n !== name) : [...before, name];
+    setChosen(next);
+    try {
+      await api.setInterests(userId, next);
+    } catch (err) {
+      setChosen(before);
+      toast({ message: `Could not save your topics: ${err.message}`, icon: 'alert' });
+    }
+  }
+
+  return (
+    <section className="space-y-3" aria-labelledby="topics-heading" data-testid="topics-section">
+      <div>
+        <h2 id="topics-heading" className="font-display text-xl">Topics</h2>
+        <p className="mt-1 text-sm text-muted">Pick the topics you care about. Saved as you go.</p>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {chosen && topics.map((t) => {
+          const on = chosen.includes(t.name);
+          return (
+            <button
+              key={t.slug}
+              type="button"
+              onClick={() => toggle(t.name)}
+              aria-pressed={on}
+              data-testid={`topic-chip-${t.slug}`}
+              className={cx(
+                'inline-flex items-center rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-all',
+                on
+                  ? 'border-violet-400/50 bg-violet-500/15 text-ink'
+                  : 'border-hairline bg-raised text-muted hover:border-white/20 hover:text-ink',
+              )}
+            >
+              {t.name}
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function VenueSection({ userId }) {
+  const { venues = [] } = useConference();
+  const toast = useToast();
+  // undefined while loading; null means Either.
+  const [chosen, setChosen] = useState(undefined);
+
+  useEffect(() => {
+    let live = true;
+    setChosen(undefined);
+    api.getUser(userId).then((u) => live && setChosen(u.preferredVenueId)).catch(() => live && setChosen(null));
+    return () => { live = false; };
+  }, [userId]);
+
+  async function choose(venueId) {
+    const before = chosen;
+    if (venueId === before) return;
+    setChosen(venueId);
+    try {
+      await api.setPreferredVenue(userId, venueId);
+    } catch (err) {
+      setChosen(before);
+      toast({ message: `Could not save your venue: ${err.message}`, icon: 'alert' });
+    }
+  }
+
+  const options = [...venues.map((v) => ({ key: v.id, id: v.id, label: v.shortName })), { key: 'either', id: null, label: 'Either' }];
+
+  return (
+    <section className="space-y-3" aria-labelledby="venue-heading" data-testid="venue-section">
+      <div>
+        <h2 id="venue-heading" className="font-display text-xl">Venue</h2>
+        <p className="mt-1 text-sm text-muted">Which venue you would rather be at. Saved as you go.</p>
+      </div>
+      <div role="radiogroup" aria-labelledby="venue-heading" className="flex flex-wrap gap-1.5">
+        {chosen !== undefined && options.map((o) => {
+          const on = chosen === o.id;
+          return (
+            <button
+              key={o.key}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => choose(o.id)}
+              data-testid={`venue-option-${o.key}`}
+              className={cx(
+                'inline-flex items-center rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-all',
+                on
+                  ? 'border-violet-400/50 bg-violet-500/15 text-ink'
+                  : 'border-hairline bg-raised text-muted hover:border-white/20 hover:text-ink',
+              )}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+/** Followed speakers, read from and written to the store so profiles stay in step. */
+function SpeakersSection() {
+  const { isFollowing, toggleFollow } = useConference();
+  const toast = useToast();
+  const [speakers, setSpeakers] = useState(null);
+
+  useEffect(() => {
+    let live = true;
+    api.getSpeakers().then((s) => live && setSpeakers(s)).catch(() => live && setSpeakers([]));
+    return () => { live = false; };
+  }, []);
+
+  async function change(id) {
+    try {
+      await toggleFollow(id);
+    } catch (err) {
+      toast({ message: `Could not update your speakers: ${err.message}`, icon: 'alert' });
+    }
+  }
+
+  const list = speakers || [];
+  const followed = list.filter((s) => isFollowing(s.id));
+  const available = list.filter((s) => !isFollowing(s.id)).sort((a, b) => a.name.localeCompare(b.name));
+
+  return (
+    <section className="space-y-3" aria-labelledby="speakers-heading" data-testid="speakers-section">
+      <div>
+        <h2 id="speakers-heading" className="font-display text-xl">Speakers</h2>
+        <p className="mt-1 text-sm text-muted">Pick the speakers you want to see. This is the same list as Follow on their profiles.</p>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {followed.map((s) => (
+          <span
+            key={s.id}
+            data-testid={`speaker-chip-${s.id}`}
+            className="inline-flex items-center gap-1.5 rounded-full border border-violet-400/50 bg-violet-500/15 py-1 pl-3 pr-1 text-[12px] font-semibold text-ink"
+          >
+            {s.name}
+            <button
+              type="button"
+              onClick={() => change(s.id)}
+              aria-label={`Unfollow ${s.name}`}
+              data-testid={`speaker-remove-${s.id}`}
+              className="grid h-5 w-5 place-items-center rounded-full text-muted hover:bg-white/10 hover:text-ink"
+            >
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
+      <select
+        value=""
+        onChange={(e) => e.target.value && change(Number(e.target.value))}
+        aria-label="Add a speaker"
+        data-testid="speaker-picker"
+        className="w-full max-w-sm rounded-lg border border-hairline bg-raised px-3 py-2 text-sm text-ink"
+      >
+        <option value="">Add a speaker…</option>
+        {available.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+      </select>
+    </section>
+  );
+}
+
+const TEXT_MAX = 500;
+
+function FreeTextSection({ userId }) {
+  const toast = useToast();
+  const [saved, setSaved] = useState(null);
+  const [text, setText] = useState('');
+  const [justSaved, setJustSaved] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    setSaved(null);
+    setText('');
+    setJustSaved(false);
+    api.getUser(userId)
+      .then((u) => { if (live) { setSaved(u.interestsText); setText(u.interestsText); } })
+      .catch(() => { if (live) setSaved(''); });
+    return () => { live = false; };
+  }, [userId]);
+
+  async function save() {
+    try {
+      const u = await api.setInterestsText(userId, text);
+      setSaved(u.interestsText);
+      setText(u.interestsText);
+      setJustSaved(true);
+    } catch (err) {
+      toast({ message: `Could not save your interests: ${err.message}`, icon: 'alert' });
+    }
+  }
+
+  const dirty = saved !== null && text.trim() !== saved;
+
+  return (
+    <section className="space-y-3" aria-labelledby="free-text-heading" data-testid="free-text-section">
+      <div>
+        <h2 id="free-text-heading" className="font-display text-xl">
+          In your own words <span className="text-sm font-normal text-muted">(optional)</span>
+        </h2>
+        <p className="mt-1 text-sm text-muted">Anything else about what you hope to get out of the conference.</p>
+      </div>
+      <textarea
+        value={text}
+        onChange={(e) => { setText(e.target.value); setJustSaved(false); }}
+        maxLength={TEXT_MAX}
+        rows={4}
+        disabled={saved === null}
+        aria-labelledby="free-text-heading"
+        data-testid="interests-text"
+        className="w-full rounded-xl border border-hairline bg-raised p-3 text-sm text-ink"
+      />
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={save}
+          disabled={!dirty}
+          data-testid="interests-text-save"
+          className="rounded-full border border-violet-400/50 bg-violet-500/15 px-4 py-1.5 text-[12px] font-semibold text-ink disabled:opacity-50"
+        >
+          Save
+        </button>
+        {justSaved && !dirty && <span className="text-sm text-muted" data-testid="interests-text-saved">Saved</span>}
+        <span className="ml-auto text-xs text-muted" data-testid="interests-text-count">{text.length} / {TEXT_MAX}</span>
+      </div>
+    </section>
+  );
+}
+
+const SECTIONS = [TopicsSection, AvailabilitySection, VenueSection, SpeakersSection, FreeTextSection];
+
+function PreferencesPanel({ userId }) {
+  return (
+    <div className="space-y-8 rounded-2xl border border-hairline bg-surface p-5 sm:p-6" data-testid="preferences-panel">
+      {SECTIONS.map((Section, i) => <Section key={i} userId={userId} />)}
+    </div>
+  );
+}
+
 export function MyAgendaPage() {
   useDocumentTitle('My Agenda');
+  const { currentUserId } = useConference();
 
   return (
     <div className="space-y-8">
       <SectionHeader eyebrow="Your conference" title="My Agenda" />
-      <section
-        className="grid place-items-center rounded-2xl border border-dashed border-hairline bg-surface px-6 py-20 text-center"
-        data-testid="agenda-coming-soon"
-      >
-        <span className="grid size-12 place-items-center rounded-xl bg-violet-500/12 text-violet-300">
-          <Icon name="ticket" className="size-5" />
-        </span>
-        <h2 className="mt-4 font-display text-2xl">Coming soon</h2>
-        <p className="mt-2 max-w-sm text-sm text-muted">
-          A new way to plan your time at the conference is on its way.
-        </p>
-        <Button to="/schedule" size="sm" className="mt-6">Browse the schedule</Button>
-      </section>
+      <PreferencesPanel userId={currentUserId} />
     </div>
   );
 }

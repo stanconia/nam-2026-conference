@@ -130,29 +130,29 @@ function LatestAnnouncement() {
 }
 
 const NOTE_LIMIT = 500;
-const countChars = (s) => Array.from(s).length;
+const countChars = (s) => s.trim().length;
 
-/** Optional free text about yourself. Shown to everyone, seats or not; read nowhere else. */
+/** Optional free text about yourself. Shown to everyone, seats or not; the same text as My Agenda's "In your own words". */
 function InterestsBox() {
   const { currentUserId } = useConference();
   const toast = useToast();
-  const { data } = useFetch(() => api.getInterestNote(currentUserId), [currentUserId]);
+  const { data } = useFetch(() => api.getUser(currentUserId), [currentUserId]);
   const [text, setText] = useState('');
   const [saved, setSaved] = useState('');
 
   useEffect(() => {
-    setText(data?.text ?? '');
-    setSaved(data?.text ?? '');
+    setText(data?.interestsText ?? '');
+    setSaved(data?.interestsText ?? '');
   }, [data]);
 
   const left = NOTE_LIMIT - countChars(text);
 
   async function save(next) {
     try {
-      const res = await api.saveInterestNote(currentUserId, next);
-      setText(res.text);
-      setSaved(res.text);
-      toast({ message: res.text ? 'Interests saved' : 'Interests cleared', icon: 'info' });
+      const res = await api.setInterestsText(currentUserId, next);
+      setText(res.interestsText);
+      setSaved(res.interestsText);
+      toast({ message: res.interestsText ? 'Interests saved' : 'Interests cleared', icon: 'info' });
     } catch (err) {
       toast({ message: `Could not save: ${err.message}`, icon: 'alert' });
     }

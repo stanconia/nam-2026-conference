@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { db } from '../db.js';
-import { SESSION_SELECT, toUser, toSpeaker, toSession } from '../lib/query.js';
+import { SESSION_SELECT, toUser, toSpeaker, toSession, toAvailability } from '../lib/query.js';
 import { reserveSeat, releaseSeat, seatState } from '../lib/seats.js';
 import { attendanceState, checkIn, rateSession } from '../lib/attendance.js';
 import { todayFor, scheduleFor } from '../lib/agenda.js';
+import { validateAvailability, sessionDays, setAvailability, availabilityFor } from '../lib/availability.js';
 import { agendaCalendar, baseUrlFor } from '../lib/ical.js';
 
 export const usersRouter = Router();
@@ -22,14 +23,14 @@ const presenting = db.prepare(`${SESSION_SELECT}
 const myReservations = db.prepare('SELECT session_id, status FROM reservations WHERE user_id = ?');
 const myCheckIns = db.prepare('SELECT session_id FROM check_ins WHERE user_id = ?');
 const myRatings = db.prepare('SELECT session_id, stars FROM ratings WHERE user_id = ?');
+const topicNames = db.prepare("SELECT name FROM tags WHERE kind = 'topic'");
+const setInterestsText = db.prepare('UPDATE users SET interests_text = ? WHERE id = ?');
+const INTERESTS_TEXT_MAX = 500;
+const setInterests = db.prepare('UPDATE users SET interests = ? WHERE id = ?');
+const venueExists = db.prepare('SELECT 1 FROM venues WHERE id = ?');
+const setPreferredVenue = db.prepare('UPDATE users SET preferred_venue_id = ? WHERE id = ?');
 const follow = db.prepare('INSERT OR IGNORE INTO speaker_follows (user_id, speaker_id) VALUES (?, ?)');
 const unfollow = db.prepare('DELETE FROM speaker_follows WHERE user_id = ? AND speaker_id = ?');
-
-const getNote = db.prepare('SELECT body FROM interest_notes WHERE user_id = ?');
-const saveNote = db.prepare(`INSERT INTO interest_notes (user_id, body, updated_at) VALUES (?, ?, datetime('now'))
-  ON CONFLICT(user_id) DO UPDATE SET body = excluded.body, updated_at = excluded.updated_at`);
-const deleteNote = db.prepare('DELETE FROM interest_notes WHERE user_id = ?');
-const NOTE_LIMIT = 500;
 
 /** Sessions this user is presenting, if their account is linked to a speaker. */
 const speakingSessions = (speakerId) =>
@@ -50,7 +51,52 @@ usersRouter.get('/:id', (req, res) => {
     reservations: myReservations.all(row.id).map((r) => ({ sessionId: r.session_id, status: r.status })),
     checkIns: myCheckIns.all(row.id).map((c) => c.session_id),
     ratings: myRatings.all(row.id).map((r) => ({ sessionId: r.session_id, stars: r.stars })),
+    availability: availabilityFor(row.id).map(toAvailability),
   }));
+});
+
+/** Replace which days (and hours on them) this attendee can attend. */
+usersRouter.put('/:id/availability', (req, res) => {
+  if (!userExists.get(req.params.id)) return res.status(404).json({ error: 'Attendee not found' });
+  const entries = req.body?.days;
+  const problem = validateAvailability(entries, sessionDays());
+  if (problem) return res.status(400).json({ error: problem });
+  setAvailability(Number(req.params.id), entries);
+  res.json(availabilityFor(Number(req.params.id)).map(toAvailability));
+});
+
+/** Replace the attendee's chosen topics. Every entry must be a topic-kind tag name. */
+usersRouter.put('/:id/interests', (req, res) => {
+  if (!userExists.get(req.params.id)) return res.status(404).json({ error: 'Attendee not found' });
+  const { interests } = req.body ?? {};
+  const topics = new Set(topicNames.all().map((t) => t.name));
+  if (!Array.isArray(interests) || !interests.every((i) => typeof i === 'string' && topics.has(i))) {
+    return res.status(400).json({ error: 'interests must be a list of topic tag names' });
+  }
+  setInterests.run([...new Set(interests)].join(','), req.params.id);
+  res.json(toUser(getUser.get(req.params.id)));
+});
+
+/** Set the attendee's preferred venue: a venue id, or null for either. */
+usersRouter.put('/:id/preferred-venue', (req, res) => {
+  if (!userExists.get(req.params.id)) return res.status(404).json({ error: 'Attendee not found' });
+  const { venueId } = req.body ?? {};
+  if (venueId !== null && !(Number.isInteger(venueId) && venueExists.get(venueId))) {
+    return res.status(400).json({ error: 'venueId must be a venue id or null' });
+  }
+  setPreferredVenue.run(venueId, req.params.id);
+  res.json(toUser(getUser.get(req.params.id)));
+});
+
+/** Set (or clear, with '') the attendee's interests in their own words. */
+usersRouter.put('/:id/interests-text', (req, res) => {
+  if (!userExists.get(req.params.id)) return res.status(404).json({ error: 'Attendee not found' });
+  const { text } = req.body ?? {};
+  if (typeof text !== 'string' || text.trim().length > INTERESTS_TEXT_MAX) {
+    return res.status(400).json({ error: `text must be a string of at most ${INTERESTS_TEXT_MAX} characters` });
+  }
+  setInterestsText.run(text.trim(), req.params.id);
+  res.json(toUser(getUser.get(req.params.id)));
 });
 
 /** A subscribable feed of everything this attendee holds a seat for. */
@@ -147,27 +193,6 @@ usersRouter.get('/:id/reservations/:sessionId', (req, res) => {
   const state = seatState(Number(req.params.sessionId), Number(req.params.id));
   if (!state) return res.status(404).json({ error: 'Session not found' });
   res.json(state);
-});
-
-// The attendee's own words about their interests. Returned only here.
-usersRouter.get('/:id/interest-note', (req, res) => {
-  if (!userExists.get(req.params.id)) return res.status(404).json({ error: 'Attendee not found' });
-  res.json({ text: getNote.get(req.params.id)?.body ?? '' });
-});
-
-usersRouter.put('/:id/interest-note', (req, res) => {
-  if (!userExists.get(req.params.id)) return res.status(404).json({ error: 'Attendee not found' });
-  const text = req.body?.text;
-  if (typeof text !== 'string') return res.status(400).json({ error: 'text must be a string' });
-  if (Array.from(text).length > NOTE_LIMIT) {
-    return res.status(400).json({ error: `text must be at most ${NOTE_LIMIT} characters` });
-  }
-  if (text.trim() === '') {
-    deleteNote.run(req.params.id);
-    return res.json({ text: '' });
-  }
-  saveNote.run(req.params.id, text);
-  res.json({ text });
 });
 
 usersRouter.put('/:id/follows/:speakerId', (req, res) => {

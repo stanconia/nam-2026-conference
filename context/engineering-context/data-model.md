@@ -30,10 +30,10 @@ Approximate counts from a fresh seed. The tables attendees write to drift as you
 | `sessions` | ~140 | 4 days × 7 slots × 5 rooms (a few slots left empty), plus a keynote and a social each day |
 | `session_speakers` | ~195 | Many-to-many, with a `role` (Speaker / Moderator / Host) |
 | `session_tags` | ~980 | Many-to-many |
-| `users` | 6 | Attendees. No passwords — there is no auth |
+| `users` | 6 | Attendees. No passwords — there is no auth. `preferred_venue_id` is nullable (NULL = either) |
 | `reservations` | ~60 | An attendee's agenda. Holds a real seat; `status` is `confirmed` or `waitlisted` |
-| `interest_notes` | 0 | One optional free-text note per attendee (`user_id` PK, `body`, `updated_at`); only `/users/:id/interest-note` reads it |
 | `speaker_follows` | ~20 | Follow button on a speaker's profile; only the speaker pages read it |
+| `user_availability` | 0, grows | Days an attendee can attend, with an optional `from_time`/`to_time` window (`HH:MM`); one row per ticked day |
 | `ratings` | ~10 | Only submittable by someone who checked in, once the session is over |
 | `check_ins` | ~10, grows | Proof of attendance; gates rating. Seeded only for Day 1's morning |
 | `vendors` | 24 | Food and drink at both venues, with opening hours and wait times |
@@ -105,7 +105,7 @@ a deterministic generated SVG portrait (`src/components/GeneratedAvatar.jsx`).
 the seed derives it from the ratings on that speaker's sessions, so most
 speakers start at 0.
 
-**`users`** — `speaker_id` links an attendee to their speaker profile. When set,
+**`users`** — `interests_text` is the attendee's free text (at most 500 characters, API-enforced; `interestsText`). `speaker_id` links an attendee to their speaker profile. When set,
 `GET /api/users/:id` returns `isSpeaker: true`, a `speaker` object and
 `speakingSessions`. The UI uses `isSpeaker` to offer "Your speaker profile" in
 the attendee menu and `speakerId` to link it and mark that profile as yours;

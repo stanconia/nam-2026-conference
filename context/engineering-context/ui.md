@@ -173,10 +173,10 @@ returns `null` when empty, wrapped in `<Reveal>`.
 **`InterestsBox`** (`interests-box`) — the one thing on Home about the attendee: an
 optional textarea (`interests-input`, 500-character `NOTE_LIMIT`, counted by code
 point) with `interests-remaining` ("N left"), `interests-save` (disabled over the
-limit or when unchanged) and `interests-clear`. It reads and writes only
-`GET/PUT /api/users/:id/interest-note` (`getInterestNote`, `saveInterestNote`;
-seats doc) for `currentUserId` and reads nothing about seats, so it shows with
-zero seats. The text is in no other payload and not on My Agenda.
+limit or when unchanged) and `interests-clear`. It reads `interestsText` from
+`api.getUser` and writes it with `api.setInterestsText` (`PUT /api/users/:id/interests-text`)
+for `currentUserId`, the same field as My Agenda's "In your own words" box, and reads
+nothing about seats, so it shows with zero seats.
 
 **`RouteChange`** — on `pathname` change only (not search), scrolls to top and
 focuses `#main`. **`NotFoundPage`** — the `*` route; its heading "Nothing
