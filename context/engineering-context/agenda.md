@@ -28,6 +28,11 @@ follows the attendee switch, saved optimistically on each toggle by
 400 unless every entry is a topic tag name, 404 for an unknown attendee; stores
 de-duplicated names in `users.interests`, returns `toUser`). The page owns this state;
 `currentUser.interests` from bootstrap is stale after a save. Nothing else reads it yet.
+The second is `SpeakersSection` (`speakers-section`): it reads and writes the store's
+follow state (`isFollowing`, `toggleFollow`), so it and the speaker profile's Follow button
+always agree. Followed speakers are chips (`speaker-chip-<id>`, remove `speaker-remove-<id>`);
+a native `<select data-testid="speaker-picker">` lists only the programme's unfollowed
+speakers from `api.getSpeakers()`, so nothing outside the programme can be picked.
 Everything else underneath is built and tested:
 adding a session takes a seat (seats doc), and the payloads below are served,
 with matching functions in `src/lib/api.js`. What a day is made of is decided in
