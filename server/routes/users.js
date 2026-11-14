@@ -24,6 +24,8 @@ const myReservations = db.prepare('SELECT session_id, status FROM reservations W
 const myCheckIns = db.prepare('SELECT session_id FROM check_ins WHERE user_id = ?');
 const myRatings = db.prepare('SELECT session_id, stars FROM ratings WHERE user_id = ?');
 const topicNames = db.prepare("SELECT name FROM tags WHERE kind = 'topic'");
+const setInterestsText = db.prepare('UPDATE users SET interests_text = ? WHERE id = ?');
+const INTERESTS_TEXT_MAX = 500;
 const setInterests = db.prepare('UPDATE users SET interests = ? WHERE id = ?');
 const venueExists = db.prepare('SELECT 1 FROM venues WHERE id = ?');
 const setPreferredVenue = db.prepare('UPDATE users SET preferred_venue_id = ? WHERE id = ?');
@@ -83,6 +85,17 @@ usersRouter.put('/:id/preferred-venue', (req, res) => {
     return res.status(400).json({ error: 'venueId must be a venue id or null' });
   }
   setPreferredVenue.run(venueId, req.params.id);
+  res.json(toUser(getUser.get(req.params.id)));
+});
+
+/** Set (or clear, with '') the attendee's interests in their own words. */
+usersRouter.put('/:id/interests-text', (req, res) => {
+  if (!userExists.get(req.params.id)) return res.status(404).json({ error: 'Attendee not found' });
+  const { text } = req.body ?? {};
+  if (typeof text !== 'string' || text.trim().length > INTERESTS_TEXT_MAX) {
+    return res.status(400).json({ error: `text must be a string of at most ${INTERESTS_TEXT_MAX} characters` });
+  }
+  setInterestsText.run(text.trim(), req.params.id);
   res.json(toUser(getUser.get(req.params.id)));
 });
 

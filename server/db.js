@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS users (
   interests   TEXT NOT NULL DEFAULT '',
   -- NULL means no preference ("either").
   preferred_venue_id INTEGER REFERENCES venues(id),
+  interests_text TEXT NOT NULL DEFAULT '',
   -- Attendees who are also presenting link to their speakers row.
   speaker_id  INTEGER REFERENCES speakers(id)
 );

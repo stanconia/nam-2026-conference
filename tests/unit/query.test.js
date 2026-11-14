@@ -138,6 +138,11 @@ describe('The other mappers hold the same boundary', () => {
     assert.equal(u.speakerId, null);
   });
 
+  test('interestsText defaults to empty', () => {
+    assert.equal(toUser({ interests_text: 'Evals' }).interestsText, 'Evals');
+    assert.equal(toUser({}).interestsText, '');
+  });
+
   test('interests survive the round trip as a clean list', () => {
     assert.deepEqual(toUser({ interests: 'Agent Design,Evaluation,' }).interests, ['Agent Design', 'Evaluation']);
     assert.deepEqual(toUser({ interests: '' }).interests, []);
