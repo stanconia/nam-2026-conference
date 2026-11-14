@@ -38,3 +38,47 @@ test('topics can be chosen, survive a reload and follow the attendee', async ({ 
     await request.put(`${API}/users/${ATTENDEES.marcus}/interests`, { data: { interests: original } });
   }
 });
+
+test('speakers: followed ones are listed, picking and removing follow and unfollow, and the profile agrees', async ({ page, request }, testInfo) => {
+  // Follows are shared state and the projects run concurrently: one attendee each.
+  const user = testInfo.project.name === 'mobile' ? ATTENDEES.kenji : ATTENDEES.marcus;
+  const programme = await (await request.get(`${API}/speakers`)).json();
+  const followed = async () => (await (await request.get(`${API}/users/${user}`)).json()).followedSpeakers.map((s) => s.id);
+  const before = await followed();
+  const [seeded, picked] = programme.filter((s) => !before.includes(s.id));
+
+  try {
+    await request.put(`${API}/users/${user}/follows/${seeded.id}`);
+    await visit(page, '/my-agenda', { as: user });
+    await expect(page.getByTestId('speakers-section')).toBeVisible();
+    await expect(page.getByTestId(`speaker-chip-${seeded.id}`)).toBeVisible();
+    for (const id of before) await expect(page.getByTestId(`speaker-chip-${id}`)).toBeVisible();
+
+    // The picker offers only programme speakers, and never one already followed.
+    const values = await page.getByTestId('speaker-picker').locator('option[value]:not([value=""])').evaluateAll((os) => os.map((o) => Number(o.value)));
+    const programmeIds = new Set(programme.map((s) => s.id));
+    expect(values.length).toBeGreaterThan(0);
+    expect(values.every((v) => programmeIds.has(v))).toBe(true);
+    expect(values).not.toContain(seeded.id);
+
+    await page.getByTestId('speaker-picker').selectOption(String(picked.id));
+    await expect(page.getByTestId(`speaker-chip-${picked.id}`)).toBeVisible();
+    expect(await followed()).toContain(picked.id);
+    await expect(page.getByTestId('speaker-picker').locator(`option[value="${picked.id}"]`)).toHaveCount(0);
+    await shotForPR(page, 'My Agenda speakers followed');
+
+    // Profile agrees, and unfollowing there is reflected back on My Agenda.
+    await page.goto(`/speakers/${picked.id}`);
+    await expect(page.getByTestId('follow-speaker')).toHaveAttribute('aria-pressed', 'true');
+    await page.getByTestId('follow-speaker').click();
+    await expect(page.getByTestId('follow-speaker')).toHaveAttribute('aria-pressed', 'false');
+    await page.goto('/my-agenda');
+    await expect(page.getByTestId(`speaker-chip-${picked.id}`)).toHaveCount(0);
+
+    await page.getByTestId(`speaker-remove-${seeded.id}`).click();
+    await expect(page.getByTestId(`speaker-chip-${seeded.id}`)).toHaveCount(0);
+    expect(await followed()).not.toContain(seeded.id);
+  } finally {
+    for (const id of [seeded.id, picked.id]) await request.delete(`${API}/users/${user}/follows/${id}`);
+  }
+});
